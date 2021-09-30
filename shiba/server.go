@@ -12,7 +12,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/robfig/cron/v3"
-	"go.uber.org/zap"
 
 	"github.com/windzhu0514/shiba/hihttp"
 	"github.com/windzhu0514/shiba/log"
@@ -46,6 +45,18 @@ func (s *server) Start(opts ...Option) {
 		opt()
 	}
 
+	for _, mod := range modules {
+		_, exist := fileCfg[mod.Name]
+		if !exist {
+			continue
+		}
+
+		if err := mod.Module.Init(); err != nil {
+			defaultLogger.Errorf("module [%s] init:%s", mod.Name, err.Error())
+			return
+		}
+	}
+
 	flagPort := s.flags.String("p", "", "listen port. default:9999")
 	flagConfigFile := s.flags.String("f", "conf.yaml", "config file name")
 	if err := s.flags.Parse(os.Args[1:]); err != nil {
@@ -70,24 +81,28 @@ func (s *server) Start(opts ...Option) {
 			return
 		}
 
-		defaultLogger=log.New("shiba", nil, cfg)
-	}else{
-		defaultLogger=log.New("", nil, log.Config{})
+		defaultLogger = log.New("shiba", nil, cfg)
+	} else {
+		defaultLogger = log.New("", nil, log.Config{})
 	}
 
 	for _, mod := range modules {
 		_, exist := fileCfg[mod.Name]
-		if exist {
-			if err := rawFileCfg.Decode(mod.Module); err != nil {
-				defaultLogger.Errorf("module [%s] decode config:%s", mod.Name, err.Error())
-				return
-			}
+		if !exist {
+			continue
 		}
 
-		if err := mod.Module.Init(); err != nil {
-			defaultLogger.Errorf("module [%s] init:%s", mod.Name, err.Error())
+		if err := rawFileCfg.Decode(mod.Module); err != nil {
+			defaultLogger.Errorf("module [%s] decode config:%s", mod.Name, err.Error())
 			return
 		}
+
+		if err := mod.Module.Start(); err != nil {
+			defaultLogger.Errorf("module [%s] start:%s\n", mod.Name, err.Error())
+			return
+		}
+
+		defaultLogger.Infof("module [%s] priority:%d start success", mod.Name, mod.Priority)
 	}
 
 	if s.openCron {
@@ -98,22 +113,12 @@ func (s *server) Start(opts ...Option) {
 			cron.WithParser(cron.NewParser(
 				cron.SecondOptional|cron.Minute|cron.Hour|cron.Dom|cron.Month|cron.Dow|cron.Descriptor,
 			)))
-	}
-
-	for _, mod := range modules {
-		if err := mod.Module.Start(); err != nil {
-			defaultLogger.Errorf("module [%s] start:%s\n", mod.Name, err.Error())
-			return
-		}
-
-		defaultLogger.Infof("module [%s] priority:%d start success", mod.Name, mod.Priority)
+		defaultServer.cron.Start()
 	}
 
 	if s.openMetric {
 		s.router.Handle("/metrics", promhttp.Handler())
 	}
-
-	defaultServer.router.HandleFunc("/log_level", defaultLogger.ServeHTTP)
 
 	if s.pprof {
 		s.router.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
@@ -122,6 +127,10 @@ func (s *server) Start(opts ...Option) {
 		s.router.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		s.router.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	}
+
+	//  curl -X PUT localhost:8080/log_level?level=debug -H "Content-Type: application/x-www-form-urlencoded"
+	//  curl -X PUT localhost:8080/log_level -H "Content-Type: application/json" -d '{"level":"debug"}'
+	defaultServer.router.HandleFunc("/log_level", defaultLogger.ServeHTTP)
 
 	var port string
 	if *flagPort != "" {
@@ -151,20 +160,19 @@ func (s *server) Start(opts ...Option) {
 		defaultServer.KeyFile = keyFile
 	}
 
-	defaultServer.cron.Start()
-
-	svr:=hihttp.NewServer(":"+port, defaultServer.router)
+	svr := hihttp.NewServer(":"+port, defaultServer.router)
 	svr.RegisterOnShutdown(func() {
+		fmt.Println("Stop")
 		s.Stop()
 	})
 
-	if defaultServer.CertFile=="" && defaultServer.KeyFile==""{
-		if err:=svr.ListenAndServe();err!=nil&&err!=http.ErrServerClosed{
+	if defaultServer.CertFile == "" && defaultServer.KeyFile == "" {
+		if err := svr.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			defaultLogger.Error("ListenAndServe:" + err.Error())
 		}
-	}else{
-		if err:=svr.ListenAndServeTLS(defaultServer.CertFile,
-			defaultServer.KeyFile);err != nil&&err!=http.ErrServerClosed {
+	} else {
+		if err := svr.ListenAndServeTLS(defaultServer.CertFile,
+			defaultServer.KeyFile); err != nil && err != http.ErrServerClosed {
 			defaultLogger.Error("ListenAndServe:" + err.Error())
 		}
 	}
@@ -186,11 +194,10 @@ func (s *server) Stop() {
 		}
 
 		if err := mod.Module.Stop(); err != nil {
-			defaultLogger.Error("module stop:"+err.Error(), zap.String("moduleName", mod.Name))
+			defaultLogger.Infof("module [%s] stop:%s", mod.Name, err.Error())
 			// not return
 		} else {
-			defaultLogger.Info("stop success",
-				zap.String("moduleName", mod.Name), zap.Int("priority", mod.Priority))
+			defaultLogger.Infof("module [%s] priority:%d stop success", mod.Name, mod.Priority)
 		}
 	}
 }
@@ -255,6 +262,10 @@ func Redis(name string) (redis.Cmdable, error) {
 
 func Router() *mux.Router {
 	return defaultServer.router
+}
+
+func FlagSet() *flag.FlagSet {
+	return defaultServer.flags
 }
 
 func Cron() *cron.Cron {
