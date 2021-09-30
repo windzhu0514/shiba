@@ -13,22 +13,14 @@ type HttpServer interface {
 	RegisterOnShutdown(f func())
 }
 
-func NewServer(addr string, handler http.Handler)HttpServer{
-	return newServer(addr,handler)
+func NewServer(addr string, handler http.Handler) HttpServer {
+	return newServer(addr, handler)
 }
 
 func ListenAndServe(addr string, handler http.Handler) error {
-	if err := listenAndServe(addr, handler); err != nil {
-		return err
-	}
-
-	return nil
+	return listenAndServe(addr, handler)
 }
 
 func ListenAndServeTLS(addr, certFile, keyFile string, handler http.Handler) error {
-	if err := listenAndServeTLS(addr, certFile, keyFile, handler); err != nil {
-		return err
-	}
-
-	return nil
+	return listenAndServeTLS(addr, certFile, keyFile, handler)
 }

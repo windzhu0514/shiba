@@ -1,7 +1,6 @@
 package hello
 
 import (
-	"flag"
 	"fmt"
 	"net/http"
 
@@ -25,7 +24,7 @@ func (h *Hello) Init() error {
 	shiba.Router().HandleFunc("/hello", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("hello"))
 	})
-	flag.StringVar(&h.FlagName, "name", "", "hello to who")
+	shiba.FlagSet().StringVar(&h.FlagName, "name", "", "hello to who")
 	return nil
 }
 
