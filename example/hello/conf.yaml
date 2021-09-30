@@ -1,0 +1,10 @@
+production: false
+port: 9999
+log:
+  fileName: "./logs/log.log"
+  maxSize: 50
+  maxAge: 3
+hello:
+  str: "hahahaha"
+
+

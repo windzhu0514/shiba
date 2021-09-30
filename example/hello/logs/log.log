@@ -1,0 +1,33 @@
+2021-09-30 10:33:35.448 error server server/server.go:99 start failed:localhost master:sql: unknown driver "mysql" (forgotten import?) {"moduleName": "database"}
+2021-09-30 10:36:00.254 error server server/server.go:99 start failed:localhost master:dial tcp [::1]:3307: connectex: No connection could be made because the target machine actively refused it. {"moduleName": "database"}
+2021-09-30 10:36:24.369 info server server/server.go:103 start success {"moduleName": "database", "priority": -99}
+2021-09-30 10:36:24.377 info server server/server.go:103 start success {"moduleName": "redis", "priority": -98}
+2021-09-30 10:36:24.377 info server server/server.go:103 start success {"moduleName": "hello", "priority": 1}
+2021-09-30 10:37:07.03 info server server/server.go:144 --------------- server is closing ---------------
+2021-09-30 10:37:07.044 info server server/server.go:159 --------------- server is closed ---------------
+2021-09-30 10:39:53.822 info server server/server.go:103 start success {"moduleName": "database", "priority": -99}
+2021-09-30 10:39:53.829 info server server/server.go:103 start success {"moduleName": "redis", "priority": -98}
+2021-09-30 10:39:53.83 info server server/server.go:103 start success {"moduleName": "hello", "priority": 1}
+2021-09-30 10:39:55.397 info server server/server.go:144 --------------- server is closing ---------------
+2021-09-30 10:39:55.411 info server server/server.go:159 --------------- server is closed ---------------
+2021-09-30 10:51:43.046 info shiba/server.go:109 module [database] priority:-99 start success
+2021-09-30 10:51:43.056 debug redis shiba/redis.go:53 has no config,the module is not initialized
+2021-09-30 10:51:43.056 info shiba/server.go:109 module [redis] priority:-98 start success
+2021-09-30 10:51:43.056 info shiba/server.go:109 module [hello] priority:1 start success
+2021-09-30 10:51:43.056 debug shiba/log.go:22 start
+2021-09-30 10:51:43.058 error shiba/server.go:168 ListenAndServe:open : The system cannot find the file specified.
+2021-09-30 10:52:04.522 info shiba/server.go:109 module [database] priority:-99 start success
+2021-09-30 10:52:04.53 debug redis shiba/redis.go:53 has no config,the module is not initialized
+2021-09-30 10:52:04.53 info shiba/server.go:109 module [redis] priority:-98 start success
+2021-09-30 10:52:04.53 info shiba/server.go:109 module [hello] priority:1 start success
+2021-09-30 10:52:04.53 debug shiba/log.go:22 start
+2021-09-30 10:52:04.534 error shiba/server.go:168 ListenAndServe:open : The system cannot find the file specified.
+2021-09-30 10:53:03.324 info shiba/server.go:109 module [database] priority:-99 start success
+2021-09-30 10:53:03.335 debug redis shiba/redis.go:53 has no config,the module is not initialized
+2021-09-30 10:53:03.335 info shiba/server.go:109 module [redis] priority:-98 start success
+2021-09-30 10:53:03.335 info shiba/server.go:109 module [hello] priority:1 start success
+2021-09-30 10:53:42.609 info shiba/server.go:109 module [database] priority:-99 start success
+2021-09-30 10:53:42.617 debug redis shiba/redis.go:53 has no config,the module is not initialized
+2021-09-30 10:53:42.617 info shiba/server.go:109 module [redis] priority:-98 start success
+2021-09-30 10:53:42.617 info shiba/server.go:109 module [hello] priority:1 start success
+2021-09-30 10:53:42.617 debug shiba/log.go:22 start
