@@ -42,6 +42,7 @@ type Config struct {
 	MaxSize       int    `json:"maxSize" yaml:"maxSize"`
 	MaxAge        int    `json:"maxAge" yaml:"maxAge"`
 	MaxBackups    int    `json:"maxBackups" yaml:"maxBackups"`
+	UTCTime       bool   `json:"utcTime" yaml:"utcTime"`
 	Compress      bool   `json:"compress" yaml:"compress"`
 }
 
@@ -67,7 +68,7 @@ type Logger interface {
 
 var defaultLogger = New("", nil, Config{})
 
-func New(name string, w io.Writer, cfg Config) Logger {
+func New(name string, w io.WriteCloser, cfg Config) Logger {
 	encoderConfig := zapcore.EncoderConfig{
 		MessageKey:       "msg",
 		LevelKey:         "level",
@@ -97,11 +98,17 @@ func New(name string, w io.Writer, cfg Config) Logger {
 			MaxSize:    cfg.MaxSize,
 			MaxAge:     cfg.MaxAge,
 			MaxBackups: cfg.MaxBackups,
-			LocalTime:  true,
+			LocalTime:  !cfg.UTCTime,
+			Compress:   cfg.Compress,
 		}
 
 		if cfg.RotatorMode == RotateModeDaily {
-			rotator = &dailyRotator{}
+			rotator = &dailyRotator{
+				Filename:  cfg.FileName,
+				MaxAge:    cfg.MaxAge,
+				LocalTime: !cfg.UTCTime,
+				Compress:  cfg.Compress,
+			}
 		}
 
 		ws = append(ws, rotator)
