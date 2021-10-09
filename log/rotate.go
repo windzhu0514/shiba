@@ -20,8 +20,6 @@ const (
 	defaultMaxSize   = 100
 )
 
-var _ io.WriteCloser = (*dailyRotator)(nil)
-
 type dailyRotator struct {
 	Filename  string `json:"filename" yaml:"filename"`
 	MaxAge    int    `json:"maxage" yaml:"maxage"`
@@ -51,9 +49,7 @@ func (r *dailyRotator) Write(p []byte) (n int, err error) {
 		}
 	}
 
-	n, err = r.file.Write(p)
-
-	return n, nil
+	return 0, nil
 }
 
 func (r *dailyRotator) Close() error {
