@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/natefinch/lumberjack"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 const (
@@ -36,12 +36,12 @@ const (
 type Config struct {
 	EncoderMode   string `json:"encoderMode" yaml:"encoderMode"`
 	RotatorMode   string `json:"rotatorMode" yaml:"rotatorMode"`
-	Level         int    `json:"level" yaml:"level"`
+	Level         Level  `json:"level" yaml:"level"`
 	WithoutCaller bool   `json:"withoutCaller" yaml:"withoutCaller"`
 	FileName      string `json:"fileName" yaml:"fileName"`
-	MaxSize       int    `json:"maxSize" yaml:"maxSize"`
+	MaxSize       int    `json:"maxSize" yaml:"maxSize"` // RotateModeDaily 模式无效
 	MaxAge        int    `json:"maxAge" yaml:"maxAge"`
-	MaxBackups    int    `json:"maxBackups" yaml:"maxBackups"`
+	MaxBackups    int    `json:"maxBackups" yaml:"maxBackups"` // RotateModeDaily 模式无效
 	UTCTime       bool   `json:"utcTime" yaml:"utcTime"`
 	Compress      bool   `json:"compress" yaml:"compress"`
 }
@@ -79,7 +79,7 @@ func New(name string, w io.WriteCloser, cfg Config) Logger {
 		StacktraceKey:    "stacktrace",
 		LineEnding:       zapcore.DefaultLineEnding,
 		EncodeLevel:      zapcore.LowercaseLevelEncoder,
-		EncodeTime:       zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.999"),
+		EncodeTime:       zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000"),
 		EncodeDuration:   zapcore.StringDurationEncoder,
 		EncodeCaller:     zapcore.ShortCallerEncoder,
 		EncodeName:       zapcore.FullNameEncoder,
@@ -91,24 +91,24 @@ func New(name string, w io.WriteCloser, cfg Config) Logger {
 		encoder = zapcore.NewJSONEncoder(encoderConfig)
 	}
 
-	var ws []io.Writer
+	var ws []zapcore.WriteSyncer
 	if len(cfg.FileName) > 0 {
-		var rotator io.Writer = &lumberjack.Logger{
+		var rotator zapcore.WriteSyncer = writerWrapper{&lumberjack.Logger{
 			Filename:   cfg.FileName,
 			MaxSize:    cfg.MaxSize,
 			MaxAge:     cfg.MaxAge,
 			MaxBackups: cfg.MaxBackups,
 			LocalTime:  !cfg.UTCTime,
 			Compress:   cfg.Compress,
-		}
+		}}
 
 		if cfg.RotatorMode == RotateModeDaily {
-			rotator = &dailyRotator{
+			rotator = writerWrapper{&dailyRotator{
 				Filename:  cfg.FileName,
 				MaxAge:    cfg.MaxAge,
 				LocalTime: !cfg.UTCTime,
 				Compress:  cfg.Compress,
-			}
+			}}
 		}
 
 		ws = append(ws, rotator)
@@ -117,13 +117,13 @@ func New(name string, w io.WriteCloser, cfg Config) Logger {
 	}
 
 	if w != nil {
-		ws = append(ws, w)
+		ws = append(ws, writerWrapper{w})
 	}
 
 	level := zap.NewAtomicLevelAt(zapcore.Level(cfg.Level - 1))
 	core := zapcore.NewCore(
 		encoder,
-		zapcore.AddSync(io.MultiWriter(ws...)),
+		zapcore.NewMultiWriteSyncer(ws...),
 		level,
 	)
 
@@ -283,4 +283,12 @@ func (l *logger) Close() error {
 
 func (l *logger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	l.level.ServeHTTP(w, r)
+}
+
+type writerWrapper struct {
+	io.WriteCloser
+}
+
+func (w writerWrapper) Sync() error {
+	return w.Close()
 }
