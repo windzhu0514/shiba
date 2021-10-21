@@ -49,6 +49,8 @@ func (r *dailyRotator) Write(p []byte) (n int, err error) {
 		if err := r.rotate(); err != nil {
 			return 0, err
 		}
+
+		r.rotatedDate = time.Now().Format(backupTimeFormat)
 	}
 
 	n, err = r.file.Write(p)
@@ -88,6 +90,8 @@ func (r *dailyRotator) rotate() error {
 
 func (r *dailyRotator) openExistingOrNew() error {
 	r.mill()
+
+	r.rotatedDate = time.Now().Format(backupTimeFormat)
 
 	fileName := r.filename()
 	_, err := os.Stat(fileName)

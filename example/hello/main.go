@@ -7,5 +7,5 @@ import (
 
 func main() {
 	shiba.RegisterModule(1, &hello.Hello{})
-	shiba.Start(shiba.WithPprof(), shiba.WithCron())
+	shiba.Start(shiba.WithPprof(), shiba.WithCron(), shiba.WithMiddleware())
 }

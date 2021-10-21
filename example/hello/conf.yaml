@@ -1,5 +1,9 @@
-production: false
-port: 9999
+shiba:
+  production: true
+  port: 9999
+  certFile: "certFile"
+  keyFile: "keyFile"
+  disableSignatureCheck: true
 log:
   fileName: "./logs/log.log"
   maxSize: 50

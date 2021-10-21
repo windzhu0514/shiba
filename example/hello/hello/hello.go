@@ -1,8 +1,8 @@
 package hello
 
 import (
+	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/windzhu0514/shiba/shiba"
 )
@@ -21,9 +21,7 @@ func (h *Hello) Name() string {
 }
 
 func (h *Hello) Init() error {
-	shiba.Router().HandleFunc("/hello", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Write([]byte("hello"))
-	})
+	shiba.Router().Handle("/hello", wrapHandle(h.helloHandler))
 	shiba.FlagSet().StringVar(&h.FlagName, "name", "", "hello to who")
 	return nil
 }
@@ -49,4 +47,22 @@ func (h *Hello) Stop() error {
 	fmt.Println("hello service is stop:" + h.Config.Str)
 	shiba.Logger("hello").Error("hahhahah hello")
 	return nil
+}
+
+type HelloReqData struct {
+}
+
+type HelloRespData struct {
+}
+
+func (h *Hello) helloHandler(request *CommonRequest) (code int, msg string, data interface{}) {
+	var requestData HelloReqData
+	err := json.Unmarshal(request.Data, &requestData)
+	if err != nil {
+		return ErrCodeParamError, "json解析异常:" + err.Error(), nil
+	}
+
+	var respData HelloRespData
+
+	return ErrCodeOk, "", respData
 }
