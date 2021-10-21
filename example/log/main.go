@@ -34,6 +34,7 @@ func main() {
 	ml.Error("test log")
 	for {
 		ml.Debug("test debug log")
+		ml.Info("test info log")
 		ml.Error("test error log")
 		time.Sleep(5 * time.Second)
 	}
