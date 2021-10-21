@@ -6,10 +6,10 @@ import (
 )
 
 type Module interface {
-	Name() string
-	Init() error
-	Start() error
-	Stop() error
+	Name() string // 模块名
+	Init() error  // 初始化模块、添加路由、flags
+	Start() error // 启动模块
+	Stop() error  // 停止模块
 }
 
 type module struct {

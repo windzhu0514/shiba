@@ -21,21 +21,30 @@ func Start(opts ...Option) {
 	defaultServer.Start(opts...)
 }
 
+type serverConfig struct {
+	Production            bool   `yaml:"production"`
+	Port                  string `yaml:"port"`
+	CertFile              string `yaml:"certFile"`
+	KeyFile               string `yaml:"keyFile"`
+	DisableSignatureCheck bool   `yaml:"disableSignatureCheck"`
+
+	// options
+	configFile  string
+	pprof       bool
+	openCron    bool
+	openMetric  bool
+	middlewares []mux.MiddlewareFunc
+}
+
 type server struct {
+	Config serverConfig `yaml:"shiba"`
+
 	flags  *flag.FlagSet
 	router *mux.Router
 	cron   *cron.Cron
-
-	// options
-	configFile string
-	CertFile   string
-	KeyFile    string
-	pprof      bool
-	openCron   bool
-	openMetric bool
 }
 
-var defaultServer = server{
+var defaultServer = &server{
 	router: mux.NewRouter(),
 	flags:  flag.NewFlagSet(os.Args[0], flag.ExitOnError),
 }
@@ -46,45 +55,43 @@ func (s *server) Start(opts ...Option) {
 	}
 
 	for _, mod := range modules {
-		_, exist := fileCfg[mod.Name]
-		if !exist {
-			continue
-		}
-
 		if err := mod.Module.Init(); err != nil {
 			defaultLogger.Errorf("module [%s] init:%s", mod.Name, err.Error())
 			return
 		}
 	}
 
-	flagPort := s.flags.String("p", "", "listen port. default:9999")
-	flagConfigFile := s.flags.String("f", "conf.yaml", "config file name")
+	flagPort := s.flags.String("p", "9999", "listen port")
+	flagConfigFile := s.flags.String("f", "shiba.yaml", "config file path")
 	if err := s.flags.Parse(os.Args[1:]); err != nil {
 		fmt.Println("flag parse:" + err.Error())
 		return
 	}
 
+	// 命令行覆盖option
 	if *flagConfigFile != "" {
-		s.configFile = *flagConfigFile
+		s.Config.configFile = *flagConfigFile
 	}
 
-	if err := loadConfig(s.configFile); err != nil {
+	if err := loadConfig(s.Config.configFile); err != nil {
 		fmt.Println("load config file:" + err.Error())
 		return
 	}
 
-	logNode, exist := fileCfg["log"]
-	if exist {
-		var cfg log.Config
-		if err := logNode.Decode(&cfg); err != nil {
-			fmt.Println("module [log] decode config:" + err.Error())
-			return
-		}
-
-		defaultLogger = log.New("shiba", nil, cfg)
-	} else {
-		defaultLogger = log.New("", nil, log.Config{})
+	// 配置覆盖option
+	if err := rawFileCfg.Decode(defaultServer); err != nil {
+		defaultLogger.Errorf("module [server] decode config:%s", err.Error())
+		return
 	}
+
+	logNode, _ := fileCfg["log"]
+	var cfg log.Config
+	if err := logNode.Decode(&cfg); err != nil {
+		fmt.Println("module [log] decode config:" + err.Error())
+		return
+	}
+
+	defaultLogger = log.New("shiba", nil, cfg)
 
 	for _, mod := range modules {
 		_, exist := fileCfg[mod.Name]
@@ -105,7 +112,7 @@ func (s *server) Start(opts ...Option) {
 		defaultLogger.Infof("module [%s] priority:%d start success", mod.Name, mod.Priority)
 	}
 
-	if s.openCron {
+	if s.Config.openCron {
 		cronLogger := cronLogger{logger: defaultLogger}
 		defaultServer.cron = cron.New(
 			cron.WithLogger(cronLogger),
@@ -116,11 +123,11 @@ func (s *server) Start(opts ...Option) {
 		defaultServer.cron.Start()
 	}
 
-	if s.openMetric {
+	if s.Config.openMetric {
 		s.router.Handle("/metrics", promhttp.Handler())
 	}
 
-	if s.pprof {
+	if s.Config.pprof {
 		s.router.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
 		s.router.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 		s.router.HandleFunc("/debug/pprof/profile", pprof.Profile)
@@ -132,32 +139,9 @@ func (s *server) Start(opts ...Option) {
 	//  curl -X PUT localhost:8080/log_level -H "Content-Type: application/json" -d '{"level":"debug"}'
 	defaultServer.router.HandleFunc("/log_level", defaultLogger.ServeHTTP)
 
-	var port string
+	port := defaultServer.Config.Port
 	if *flagPort != "" {
 		port = *flagPort
-	} else {
-		if yamlNode, ok := fileCfg["port"]; ok {
-			if err := yamlNode.Decode(&port); err != nil {
-				defaultLogger.Error("decode port config:" + err.Error())
-				return
-			}
-		}
-	}
-
-	certFile := fileCfg["certFile"].Value
-	keyFile := fileCfg["keyFile"].Value
-	if certFile != "" {
-		if defaultServer.CertFile != "" {
-			defaultLogger.Infof("certFile is already set by option,use config instead")
-		}
-		defaultServer.CertFile = certFile
-	}
-
-	if keyFile != "" {
-		if defaultServer.KeyFile != "" {
-			defaultLogger.Infof("keyFile is already set by option,use config instead")
-		}
-		defaultServer.KeyFile = keyFile
 	}
 
 	svr := hihttp.NewServer(":"+port, defaultServer.router)
@@ -166,14 +150,16 @@ func (s *server) Start(opts ...Option) {
 		s.Stop()
 	})
 
-	if defaultServer.CertFile == "" && defaultServer.KeyFile == "" {
+	if defaultServer.Config.CertFile == "" && defaultServer.Config.KeyFile == "" {
+		defaultLogger.Info("ListenAndServe")
 		if err := svr.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			defaultLogger.Error("ListenAndServe:" + err.Error())
 		}
 	} else {
-		if err := svr.ListenAndServeTLS(defaultServer.CertFile,
-			defaultServer.KeyFile); err != nil && err != http.ErrServerClosed {
-			defaultLogger.Error("ListenAndServe:" + err.Error())
+		defaultLogger.Info("ListenAndServeTLS")
+		if err := svr.ListenAndServeTLS(defaultServer.Config.CertFile,
+			defaultServer.Config.KeyFile); err != nil && err != http.ErrServerClosed {
+			defaultLogger.Error("ListenAndServeTLS:" + err.Error())
 		}
 	}
 
@@ -206,33 +192,39 @@ type Option func()
 
 func WithConfig(filename string) Option {
 	return func() {
-		defaultServer.configFile = filename
+		defaultServer.Config.configFile = filename
 	}
 }
 
 func WithHttps(certFile, keyFile string) Option {
 	return func() {
-		defaultServer.CertFile = certFile
-		defaultServer.CertFile = keyFile
+		defaultServer.Config.CertFile = certFile
+		defaultServer.Config.KeyFile = keyFile
 
 	}
 }
 
 func WithPprof() Option {
 	return func() {
-		defaultServer.pprof = true
+		defaultServer.Config.pprof = true
 	}
 }
 
 func WithCron() Option {
 	return func() {
-		defaultServer.openCron = true
+		defaultServer.Config.openCron = true
 	}
 }
 
 func WithMetric() Option {
 	return func() {
-		defaultServer.openMetric = true
+		defaultServer.Config.openMetric = true
+	}
+}
+
+func WithMiddleware(middlewares ...mux.MiddlewareFunc) Option {
+	return func() {
+		defaultServer.router.Use(middlewares...)
 	}
 }
 
@@ -274,4 +266,8 @@ func Cron() *cron.Cron {
 	}
 
 	return defaultServer.cron
+}
+
+func Config() serverConfig {
+	return defaultServer.Config
 }

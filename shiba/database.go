@@ -12,7 +12,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	 _ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 func init() {
@@ -28,6 +28,7 @@ type connectConfig struct {
 	ConnMaxIdleTime time.Duration `yaml:"connMaxIdleTime"`
 	ConnMaxLifetime time.Duration `yaml:"connMaxLifetime"`
 }
+
 type databaseConfig struct {
 	Disable    bool          `yaml:"disable"`
 	DriverName string        `yaml:"driverName"`
@@ -191,16 +192,6 @@ func (db *database) Slave(name string) (*sqlx.DB, error) {
 
 	if cfg.Disable {
 		return nil, errors.New("sql config is disable:" + name)
-	}
-
-	if cfg.Slave.DataSourceName == "" {
-		xdb, err := db.new(cfg.DriverName, cfg.Master)
-		if err != nil {
-			return nil, fmt.Errorf(name+" master:%w", err)
-		}
-
-		db.dbMasters[name] = xdb
-		return xdb, nil
 	}
 
 	xdb, err := db.new(cfg.DriverName, cfg.Slave)
