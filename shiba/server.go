@@ -22,11 +22,13 @@ func Start(opts ...Option) {
 }
 
 type serverConfig struct {
+	ServiceName           string `yaml:"serviceName"`
 	Production            bool   `yaml:"production"`
 	Port                  string `yaml:"port"`
 	CertFile              string `yaml:"certFile"`
 	KeyFile               string `yaml:"keyFile"`
 	DisableSignatureCheck bool   `yaml:"disableSignatureCheck"`
+	TracingAgentHostPort  string `yaml:"tracingAgentHostPort"`
 
 	// options
 	configFile  string
@@ -62,7 +64,7 @@ func (s *server) Start(opts ...Option) {
 	}
 
 	flagPort := s.flags.String("p", "9999", "listen port")
-	flagConfigFile := s.flags.String("f", "shiba.yaml", "config file path")
+	flagConfigFile := s.flags.String("f", "shiba.yaml", "redisConfig file path")
 	if err := s.flags.Parse(os.Args[1:]); err != nil {
 		fmt.Println("flag parse:" + err.Error())
 		return
@@ -74,20 +76,20 @@ func (s *server) Start(opts ...Option) {
 	}
 
 	if err := loadConfig(s.Config.configFile); err != nil {
-		fmt.Println("load config file:" + err.Error())
+		fmt.Println("load redisConfig file:" + err.Error())
 		return
 	}
 
 	// 配置覆盖option
 	if err := rawFileCfg.Decode(defaultServer); err != nil {
-		defaultLogger.Errorf("module [server] decode config:%s", err.Error())
+		defaultLogger.Errorf("module [server] decode redisConfig:%s", err.Error())
 		return
 	}
 
 	logNode, _ := fileCfg["log"]
 	var cfg log.Config
 	if err := logNode.Decode(&cfg); err != nil {
-		fmt.Println("module [log] decode config:" + err.Error())
+		fmt.Println("module [log] decode redisConfig:" + err.Error())
 		return
 	}
 
@@ -100,7 +102,7 @@ func (s *server) Start(opts ...Option) {
 		}
 
 		if err := rawFileCfg.Decode(mod.Module); err != nil {
-			defaultLogger.Errorf("module [%s] decode config:%s", mod.Name, err.Error())
+			defaultLogger.Errorf("module [%s] decode redisConfig:%s", mod.Name, err.Error())
 			return
 		}
 
@@ -146,9 +148,24 @@ func (s *server) Start(opts ...Option) {
 
 	svr := hihttp.NewServer(":"+port, defaultServer.router)
 	svr.RegisterOnShutdown(func() {
-		fmt.Println("Stop")
 		s.Stop()
 	})
+
+	defaultServer.router.Use(defaultServer.Config.middlewares...)
+	if len(defaultServer.Config.TracingAgentHostPort) > 0 {
+		closer, err := newJaegerTracer(defaultServer.Config.ServiceName, defaultServer.Config.TracingAgentHostPort)
+		if err != nil {
+			defaultLogger.Errorf("module [shiba] Tracer:%s\n", err.Error())
+			return
+		}
+
+		svr.RegisterOnShutdown(func() {
+			if err := closer.Close(); err != nil {
+				defaultLogger.Errorf("module [shiba] Tracer Close:%s\n", err.Error())
+			}
+		})
+		defaultServer.router.Use(MiddlewareTracing)
+	}
 
 	if defaultServer.Config.CertFile == "" && defaultServer.Config.KeyFile == "" {
 		defaultLogger.Info("ListenAndServe")
@@ -222,9 +239,17 @@ func WithMetric() Option {
 	}
 }
 
-func WithMiddleware(middlewares ...mux.MiddlewareFunc) Option {
+func WithMiddleware(middlewares ...MiddlewareFunc) Option {
 	return func() {
-		defaultServer.router.Use(middlewares...)
+		for _, middleware := range middlewares {
+			defaultServer.Config.middlewares = append(defaultServer.Config.middlewares, mux.MiddlewareFunc(middleware))
+		}
+	}
+}
+
+func WithTracingAgentHostPort(addr string) Option {
+	return func() {
+		defaultServer.Config.TracingAgentHostPort = addr
 	}
 }
 

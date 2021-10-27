@@ -13,7 +13,7 @@ func init() {
 	registerModule(-98, redisx)
 }
 
-type config struct {
+type redisConfig struct {
 	Disable      bool     `yaml:"disable"`
 	IsCluster    bool     `yaml:"isCluster"` // 是否是集群
 	Address      []string `yaml:"address"`   // 大于1个地址为集群
@@ -26,7 +26,7 @@ type config struct {
 var redisx = &redisPool{}
 
 type redisPool struct {
-	Config  map[string]config `yaml:"redis"`
+	Config  map[string]redisConfig `yaml:"redis"`
 	poolsMu sync.Mutex
 	pools   map[string]redis.Cmdable
 }
@@ -50,7 +50,7 @@ func (p *redisPool) Start() error {
 
 func (p *redisPool) testAll() error {
 	if len(p.Config) == 0 {
-		defaultLogger.Clone("redis").Debug("has no config,the module is not initialized")
+		defaultLogger.Clone("redis").Debug("has no redis config,the module will not initialize")
 		return nil
 	}
 
@@ -135,7 +135,7 @@ func (p *redisPool) Get(name string) (redis.Cmdable, error) {
 	return pool, nil
 }
 
-func (p *redisPool) new(name string, cfg config) (redis.Cmdable, error) {
+func (p *redisPool) new(name string, cfg redisConfig) (redis.Cmdable, error) {
 	if len(cfg.Address) == 0 {
 		return nil, errors.New(name + ":address is empty")
 	}

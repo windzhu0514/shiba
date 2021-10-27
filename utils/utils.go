@@ -86,7 +86,7 @@ func GenOrderId() string {
 	return tmStr + tailfix
 }
 
-func dbFields(values interface{}) []string {
+func StructDBFields(values interface{}) []string {
 	v := reflect.ValueOf(values)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
