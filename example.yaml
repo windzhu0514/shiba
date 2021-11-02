@@ -1,0 +1,86 @@
+production: false
+port: 9999
+log:
+  fileName: "./logs/log.log"
+  maxSize: 50 # 日志文件转储的最大大小，单位MiB
+  maxAge: 3 # 日志文件保存的最大天数
+  compress: false # 转储的日志文件是否及进行压缩
+  level: -1 # -1 debug 0 info 1 warn 2 error
+  graylogAddr: udp://10.177.40.201:12203
+# 数据库配置
+database:
+  TCTrain_GSLogin: # 登录日志
+    disable: false
+    driverName: mysql
+    master:
+      dataSourceName: "TCTrain_GSLogin:NgXUDzrT6SYFkgaz5ppce@tcp(10.100.38.4:3068)/TCTrain_GSLogin?charset=utf8"
+      maxOpenConns: 200
+      maxIdleConns: 5
+      connMaxIdleTime: 0s # 0 连接最大空闲时间
+      connMaxLifetime: 0s # 0 连接最大生命周期
+    #slave:
+  tcticket: # 登录robot
+    disable: false
+    driverName: mysql
+    master:
+      dataSourceName: "tcdeveluser:PaSSTcdEVelU321!#@tcp(10.111.21.25:3306)/tcticket?charset=utf8"
+      maxOpenConns: 100
+      maxIdleConns: 5
+  tcticket_account:
+    disable: false
+    driverName: mysql
+    master:
+      dataSourceName: "tcticket_account:hVmyfFAdD9mB05fKET8lkl@tcp(10.100.38.230:3068)/tcticket_account?charset=utf8"
+      maxOpenConns: 100
+      maxIdleConns: 5
+    slave:
+      dataSourceName: "tcticket_account:hVmyfFAdD9mB05fKET8lkl@tcp(10.100.38.230:3068)/tcticket_account?charset=utf8"
+      maxOpenConns: 100
+      maxIdleConns: 5
+# redis配置
+redis:
+  redis_xinqu:
+    disable: false
+    isCluster: false
+    address: [127.0.0.1:6379]
+    dbIndex:
+    password:
+    poolSize: 1000
+    minIdleConns: 100
+  redis_taihu:
+    disable: false
+    isCluster: false
+    address: [127.0.0.1:6379]
+    dbIndex:
+    password:
+    poolSize: 1000
+    minIdleConns: 100
+direct_login:
+  account_source: 1 # 1 普通票账号 2 抢票账号
+  engine_type: app # web app
+  login_g_num: 1
+  ip_g_num: 1 # ip并发数量
+  control_ip: true
+  direct_login_cron_exp: "*/10 * * * *"
+  use_type: 0
+  select_limit: 500
+  bind_robot_ip:
+    robot_svr_addr: "http://172.18.144.12:6021/"
+    partner_id: tclycom
+    partner_key: jwRDanrer4TxK86P
+    request_robot_retry_times: 3 # http请求最大重试次数
+    bind_ip_retry_times: 3 # 绑定ip失败，最大重试次数
+login:
+  direct_to_robot: true
+  center_server_addr: "http://172.16.138.171/train"
+  partner:
+    id: "tclycom"
+    key: "LD35*FDS03EX823BEA7UIRV20PI"
+session:
+  session_svr_addr: "http://172.16.138.157:8285/robotservice"
+  partner_key: "3e37215ab89211e8b55a00163e0044c4"
+robot:
+  update_cron_exp: "*/5 * * * *"
+  select_extra_condition: "server_id = 1 AND functions = 256 AND disabled = 0"
+rocket_mq:
+  addr: "http://mqnameserver.17usoft.com:9876"

@@ -1,6 +1,7 @@
 package shiba
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
-	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/robfig/cron/v3"
 
@@ -16,11 +16,20 @@ import (
 	"github.com/windzhu0514/shiba/log"
 )
 
-func Start(opts ...Option) {
-	defaultServer.Start(opts...)
+func NewServer(opts ...Option) *Server {
+	svr := &Server{
+		router: mux.NewRouter(),
+		flags:  flag.NewFlagSet(os.Args[0], flag.ExitOnError),
+	}
+
+	for _, opt := range opts {
+		opt(svr)
+	}
+
+	return svr
 }
 
-type serverConfig struct {
+type ServerConfig struct {
 	ServiceName           string `yaml:"serviceName"`
 	Production            bool   `yaml:"production"`
 	Port                  string `yaml:"port"`
@@ -37,36 +46,27 @@ type serverConfig struct {
 	middlewares []mux.MiddlewareFunc
 }
 
-type server struct {
-	Config serverConfig `yaml:"shiba"`
-
+type Server struct {
+	Config ServerConfig `yaml:"shiba"`
+	ctx    *Context
 	flags  *flag.FlagSet
 	router *mux.Router
 	cron   *cron.Cron
 }
 
-var defaultServer = &server{
-	router: mux.NewRouter(),
-	flags:  flag.NewFlagSet(os.Args[0], flag.ExitOnError),
-}
-
-func (s *server) Start(opts ...Option) {
-	for _, opt := range opts {
-		opt()
-	}
+func (s *Server) Start() error {
+	s.ctx = &Context{s: s}
 
 	for _, mod := range modules {
-		if err := mod.Module.Init(); err != nil {
-			defaultLogger.Errorf("module [%s] init:%s", mod.Name, err.Error())
-			return
+		if err := mod.Module.Init(s.ctx); err != nil {
+			return fmt.Errorf("module [%s] init:%s", mod.Name, err.Error())
 		}
 	}
 
 	flagPort := s.flags.String("p", "9999", "listen port")
-	flagConfigFile := s.flags.String("f", "shiba.yaml", "redisConfig file path")
+	flagConfigFile := s.flags.String("f", "conf.yaml", "redisConfig file path")
 	if err := s.flags.Parse(os.Args[1:]); err != nil {
-		fmt.Println("flag parse:" + err.Error())
-		return
+		return fmt.Errorf("flag parse:" + err.Error())
 	}
 
 	// 命令行覆盖option
@@ -75,21 +75,18 @@ func (s *server) Start(opts ...Option) {
 	}
 
 	if err := loadConfig(s.Config.configFile); err != nil {
-		fmt.Println("load redisConfig file:" + err.Error())
-		return
+		return fmt.Errorf("load redisConfig file:" + err.Error())
 	}
 
 	// 配置覆盖option
-	if err := rawFileCfg.Decode(defaultServer); err != nil {
-		defaultLogger.Errorf("module [server] decode redisConfig:%s", err.Error())
-		return
+	if err := rawFileCfg.Decode(s); err != nil {
+		return fmt.Errorf("module [server] decode redisConfig:%s", err.Error())
 	}
 
 	logNode := fileCfg["log"]
 	var cfg log.Config
 	if err := logNode.Decode(&cfg); err != nil {
-		fmt.Println("module [log] decode redisConfig:" + err.Error())
-		return
+		return fmt.Errorf("module [log] decode redisConfig:" + err.Error())
 	}
 
 	defaultLogger = log.New("shiba", nil, cfg)
@@ -101,13 +98,15 @@ func (s *server) Start(opts ...Option) {
 		}
 
 		if err := rawFileCfg.Decode(mod.Module); err != nil {
-			defaultLogger.Errorf("module [%s] decode redisConfig:%s", mod.Name, err.Error())
-			return
+			errMsg := fmt.Sprintf("module [%s] decode redisConfig:%s", mod.Name, err.Error())
+			defaultLogger.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
 
-		if err := mod.Module.Start(); err != nil {
-			defaultLogger.Errorf("module [%s] start:%s\n", mod.Name, err.Error())
-			return
+		if err := mod.Module.Start(s.ctx); err != nil {
+			errMsg := fmt.Sprintf("module [%s] start:%s\n", mod.Name, err.Error())
+			defaultLogger.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
 
 		defaultLogger.Infof("module [%s] priority:%d start success", mod.Name, mod.Priority)
@@ -115,13 +114,13 @@ func (s *server) Start(opts ...Option) {
 
 	if s.Config.openCron {
 		cronLogger := cronLogger{logger: defaultLogger}
-		defaultServer.cron = cron.New(
+		s.cron = cron.New(
 			cron.WithLogger(cronLogger),
 			cron.WithChain(cron.SkipIfStillRunning(cronLogger)),
 			cron.WithParser(cron.NewParser(
 				cron.SecondOptional|cron.Minute|cron.Hour|cron.Dom|cron.Month|cron.Dow|cron.Descriptor,
 			)))
-		defaultServer.cron.Start()
+		s.cron.Start()
 	}
 
 	if s.Config.openMetric {
@@ -138,25 +137,26 @@ func (s *server) Start(opts ...Option) {
 
 	//  curl -X PUT localhost:8080/log_level?level=debug -H "Content-Type: application/x-www-form-urlencoded"
 	//  curl -X PUT localhost:8080/log_level -H "Content-Type: application/json" -d '{"level":"debug"}'
-	defaultServer.router.HandleFunc("/log_level", defaultLogger.ServeHTTP)
+	s.router.HandleFunc("/log_level", defaultLogger.ServeHTTP)
 
-	port := defaultServer.Config.Port
+	port := s.Config.Port
 	if *flagPort != "" {
 		port = *flagPort
 	}
 
-	svr := hihttp.NewServer(":"+port, defaultServer.router)
+	svr := hihttp.NewServer(":"+port, s.router)
 	svr.RegisterOnShutdown(func() {
-		s.Stop()
+		s.stop()
 	})
 
-	defaultServer.router.Use(defaultServer.Config.middlewares...)
+	s.router.Use(s.Config.middlewares...)
 
-	if len(defaultServer.Config.TracingAgentHostPort) > 0 {
-		closer, err := newJaegerTracer(defaultServer.Config.ServiceName, defaultServer.Config.TracingAgentHostPort)
+	if len(s.Config.TracingAgentHostPort) > 0 {
+		closer, err := newJaegerTracer(s.Config.ServiceName, s.Config.TracingAgentHostPort)
 		if err != nil {
-			defaultLogger.Errorf("module [shiba] Tracer:%s\n", err.Error())
-			return
+			errMsg := fmt.Sprintf("server new Tracer:%s", err.Error())
+			defaultLogger.Error(errMsg)
+			return errors.New(errMsg)
 		}
 
 		svr.RegisterOnShutdown(func() {
@@ -164,30 +164,33 @@ func (s *server) Start(opts ...Option) {
 				defaultLogger.Errorf("module [shiba] Tracer Close:%s\n", err.Error())
 			}
 		})
-		defaultServer.router.Use(MiddlewareTracing)
+		s.router.Use(MiddlewareTracing)
 	}
 
-	if defaultServer.Config.CertFile == "" && defaultServer.Config.KeyFile == "" {
-		defaultLogger.Info("ListenAndServe")
+	if s.Config.CertFile == "" && s.Config.KeyFile == "" {
+		defaultLogger.Info("start ListenAndServe")
 		if err := svr.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			defaultLogger.Error("ListenAndServe:" + err.Error())
 		}
 	} else {
-		defaultLogger.Info("ListenAndServeTLS")
-		if err := svr.ListenAndServeTLS(defaultServer.Config.CertFile,
-			defaultServer.Config.KeyFile); err != nil && err != http.ErrServerClosed {
+		defaultLogger.Info("start ListenAndServeTLS")
+		if err := svr.ListenAndServeTLS(s.Config.CertFile,
+			s.Config.KeyFile); err != nil && err != http.ErrServerClosed {
 			defaultLogger.Error("ListenAndServeTLS:" + err.Error())
 		}
 	}
 
 	err := defaultLogger.Close()
 	if err != nil {
-		fmt.Println("module log stop failed:" + err.Error())
-		return
+		errMsg := fmt.Sprintf("module log stop failed:" + err.Error())
+		defaultLogger.Error(errMsg)
+		return errors.New(errMsg)
 	}
+
+	return nil
 }
 
-func (s *server) Stop() {
+func (s *Server) stop() {
 	for i := len(modules) - 1; i >= 0; i-- {
 		mod := modules[i]
 
@@ -196,7 +199,7 @@ func (s *server) Stop() {
 			continue
 		}
 
-		if err := mod.Module.Stop(); err != nil {
+		if err := mod.Module.Stop(s.ctx); err != nil {
 			defaultLogger.Infof("module [%s] stop:%s", mod.Name, err.Error())
 			// not return
 		} else {
@@ -205,94 +208,10 @@ func (s *server) Stop() {
 	}
 }
 
-type Option func()
-
-func WithConfig(filename string) Option {
-	return func() {
-		defaultServer.Config.configFile = filename
-	}
-}
-
-func WithHttps(certFile, keyFile string) Option {
-	return func() {
-		defaultServer.Config.CertFile = certFile
-		defaultServer.Config.KeyFile = keyFile
-
-	}
-}
-
-func WithPprof() Option {
-	return func() {
-		defaultServer.Config.pprof = true
-	}
-}
-
-func WithCron() Option {
-	return func() {
-		defaultServer.Config.openCron = true
-	}
-}
-
-func WithMetric() Option {
-	return func() {
-		defaultServer.Config.openMetric = true
-	}
-}
-
-func WithMiddleware(middlewares ...MiddlewareFunc) Option {
-	return func() {
-		for _, middleware := range middlewares {
-			defaultServer.Config.middlewares = append(defaultServer.Config.middlewares, mux.MiddlewareFunc(middleware))
-		}
-	}
-}
-
-func WithTracingAgentHostPort(addr string) Option {
-	return func() {
-		defaultServer.Config.TracingAgentHostPort = addr
-	}
-}
-
-func RegisterModule(priority int, mod Module) {
+func (s *Server) RegisterModule(priority int, mod Module) {
 	registerModule(priority, mod)
 }
 
-func GetModule(name string) Module {
-	return getModule(name)
-}
-
-func Logger(name string) log.Logger {
-	return defaultLogger.Clone(name)
-}
-
-func DBMaster(name string) (*sqlx.DB, error) {
-	return db.Master(name)
-}
-
-func DBSlave(name string) (*sqlx.DB, error) {
-	return db.Slave(name)
-}
-
-func Redis(name string) (RedisCmdable, error) {
-	return redisx.Get(name)
-}
-
-func Router() *mux.Router {
-	return defaultServer.router
-}
-
-func FlagSet() *flag.FlagSet {
-	return defaultServer.flags
-}
-
-func Cron() *cron.Cron {
-	if defaultServer.cron == nil {
-		panic("cron not start")
-	}
-
-	return defaultServer.cron
-}
-
-func Config() serverConfig {
-	return defaultServer.Config
-}
+// func GetModule(name string) Module {
+// 	return getModule(name)
+// }

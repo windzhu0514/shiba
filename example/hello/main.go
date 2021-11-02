@@ -9,12 +9,14 @@ import (
 )
 
 func main() {
-	shiba.RegisterModule(1, &hello.Hello{})
 	var middlewares []shiba.MiddlewareFunc
 	middlewares = append(middlewares, shiba.MiddlewareRecover(func(
 		w http.ResponseWriter, r *http.Request, err interface{},
 	) {
 		w.Write([]byte(fmt.Sprint(err)))
 	}))
-	shiba.Start(shiba.WithPprof(), shiba.WithCron(), shiba.WithMiddleware(middlewares...))
+	svr := shiba.NewServer(shiba.WithPprof(), shiba.WithCron(), shiba.WithMiddleware(middlewares...))
+
+	svr.RegisterModule(1, &hello.Hello{})
+	svr.Start()
 }

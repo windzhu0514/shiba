@@ -39,12 +39,12 @@ func (p *redisPool) Name() string {
 	return "redis"
 }
 
-func (p *redisPool) Init() error {
+func (p *redisPool) Init(ctx *Context) error {
 	p.pools = make(map[string]redis.Cmdable)
 	return nil
 }
 
-func (p *redisPool) Start() error {
+func (p *redisPool) Start(ctx *Context) error {
 	if err := p.testAll(); err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (p *redisPool) testAll() error {
 	return nil
 }
 
-func (p *redisPool) Stop() error {
+func (p *redisPool) Stop(ctx *Context) error {
 	for name, pool := range p.pools {
 		if pool == nil {
 			continue

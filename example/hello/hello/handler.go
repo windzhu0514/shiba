@@ -38,14 +38,14 @@ type CommonResponse struct {
 
 type HandlerFunc func(request *CommonRequest) (code int, msg string, data interface{})
 
-func wrapHandle(h HandlerFunc) http.HandlerFunc {
+func wrapHandle(ctx *shiba.Context, h HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var (
 			commonRequest  CommonRequest
 			commonResponse CommonResponse
 		)
 
-		logger := shiba.Logger("wrapHandler")
+		logger := ctx.Logger("wrapHandler")
 
 		defer func() {
 			if r := recover(); r != nil {
@@ -87,7 +87,7 @@ func wrapHandle(h HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if !shiba.Config().DisableSignatureCheck {
+		if !ctx.Config().DisableSignatureCheck {
 			if !checkSign(commonRequest) {
 				commonResponse.Success = false
 				commonResponse.Code = ErrCodeSign

@@ -2,3 +2,11 @@
 2021-09-30 16:13:02.289 debug shiba/log.go:22 start
 2021-09-30 16:13:14.849 error hello hello/hello.go:51 hahhahah hello
 2021-09-30 16:13:14.849 info shiba/server.go:193 module [hello] priority:1 stop success
+2021-11-02 20:40:53.435 info shiba/server.go:114 module [hello] priority:1 start success
+2021-11-02 20:40:53.442 debug shiba/log.go:22 start
+2021-11-02 20:40:53.442 info shiba/server.go:177 ListenAndServeTLS
+2021-11-02 20:49:17.957 error shiba/server.go:180 ListenAndServeTLS:open certFile: The system cannot find the file specified.
+2021-11-02 20:49:23.873 info shiba/server.go:112 module [hello] priority:1 start success
+2021-11-02 20:49:23.881 info shiba/server.go:176 start ListenAndServeTLS
+2021-11-02 20:49:23.881 debug shiba/log.go:22 start
+2021-11-02 20:49:42.228 error shiba/server.go:179 ListenAndServeTLS:open certFile: The system cannot find the file specified.

@@ -47,13 +47,13 @@ func (p *database) Name() string {
 	return "database"
 }
 
-func (p *database) Init() error {
+func (p *database) Init(ctx *Context) error {
 	db.dbMasters = make(map[string]*sqlx.DB)
 	db.dbSlaves = make(map[string]*sqlx.DB)
 	return nil
 }
 
-func (db *database) Start() error {
+func (db *database) Start(ctx *Context) error {
 	if err := db.testAll(); err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (db *database) testAll() error {
 	return nil
 }
 
-func (db *database) Stop() error {
+func (db *database) Stop(ctx *Context) error {
 	for name, db := range db.dbMasters {
 		if db == nil {
 			continue
