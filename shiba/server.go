@@ -7,7 +7,6 @@ import (
 	"net/http/pprof"
 	"os"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -86,7 +85,7 @@ func (s *server) Start(opts ...Option) {
 		return
 	}
 
-	logNode, _ := fileCfg["log"]
+	logNode := fileCfg["log"]
 	var cfg log.Config
 	if err := logNode.Decode(&cfg); err != nil {
 		fmt.Println("module [log] decode redisConfig:" + err.Error())
@@ -152,6 +151,7 @@ func (s *server) Start(opts ...Option) {
 	})
 
 	defaultServer.router.Use(defaultServer.Config.middlewares...)
+
 	if len(defaultServer.Config.TracingAgentHostPort) > 0 {
 		closer, err := newJaegerTracer(defaultServer.Config.ServiceName, defaultServer.Config.TracingAgentHostPort)
 		if err != nil {
@@ -273,7 +273,7 @@ func DBSlave(name string) (*sqlx.DB, error) {
 	return db.Slave(name)
 }
 
-func Redis(name string) (redis.Cmdable, error) {
+func Redis(name string) (RedisCmdable, error) {
 	return redisx.Get(name)
 }
 

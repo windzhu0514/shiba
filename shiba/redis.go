@@ -9,6 +9,10 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
+type RedisCmdable interface {
+	redis.Cmdable
+}
+
 func init() {
 	registerModule(-98, redisx)
 }
@@ -98,7 +102,7 @@ func (p *redisPool) Stop() error {
 	return nil
 }
 
-func (p *redisPool) Get(name string) (redis.Cmdable, error) {
+func (p *redisPool) Get(name string) (RedisCmdable, error) {
 	if name == "" {
 		name = "default"
 	}
@@ -135,12 +139,12 @@ func (p *redisPool) Get(name string) (redis.Cmdable, error) {
 	return pool, nil
 }
 
-func (p *redisPool) new(name string, cfg redisConfig) (redis.Cmdable, error) {
+func (p *redisPool) new(name string, cfg redisConfig) (RedisCmdable, error) {
 	if len(cfg.Address) == 0 {
 		return nil, errors.New(name + ":address is empty")
 	}
 
-	var client redis.Cmdable
+	var client RedisCmdable
 	if cfg.IsCluster {
 		client = redis.NewClusterClient(&redis.ClusterOptions{
 			Addrs:        cfg.Address,
