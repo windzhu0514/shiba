@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/robfig/cron/v3"
 
@@ -16,17 +17,19 @@ import (
 	"github.com/windzhu0514/shiba/log"
 )
 
+var defaultServer *Server
+
 func NewServer(opts ...Option) *Server {
-	svr := &Server{
+	defaultServer = &Server{
 		router: mux.NewRouter(),
 		flags:  flag.NewFlagSet(os.Args[0], flag.ExitOnError),
 	}
 
 	for _, opt := range opts {
-		opt(svr)
+		opt(defaultServer)
 	}
 
-	return svr
+	return defaultServer
 }
 
 type ServerConfig struct {
@@ -48,17 +51,14 @@ type ServerConfig struct {
 
 type Server struct {
 	Config ServerConfig `yaml:"shiba"`
-	ctx    *Context
 	flags  *flag.FlagSet
 	router *mux.Router
 	cron   *cron.Cron
 }
 
 func (s *Server) Start() error {
-	s.ctx = &Context{s: s}
-
 	for _, mod := range modules {
-		if err := mod.Module.Init(s.ctx); err != nil {
+		if err := mod.Module.Init(); err != nil {
 			return fmt.Errorf("module [%s] init:%s", mod.Name, err.Error())
 		}
 	}
@@ -103,7 +103,7 @@ func (s *Server) Start() error {
 			return errors.New(errMsg)
 		}
 
-		if err := mod.Module.Start(s.ctx); err != nil {
+		if err := mod.Module.Start(); err != nil {
 			errMsg := fmt.Sprintf("module [%s] start:%s\n", mod.Name, err.Error())
 			defaultLogger.Errorf(errMsg)
 			return errors.New(errMsg)
@@ -199,7 +199,7 @@ func (s *Server) stop() {
 			continue
 		}
 
-		if err := mod.Module.Stop(s.ctx); err != nil {
+		if err := mod.Module.Stop(); err != nil {
 			defaultLogger.Infof("module [%s] stop:%s", mod.Name, err.Error())
 			// not return
 		} else {
@@ -215,3 +215,39 @@ func (s *Server) RegisterModule(priority int, mod Module) {
 // func GetModule(name string) Module {
 // 	return getModule(name)
 // }
+
+func Logger(name string) log.Logger {
+	return defaultLogger.Clone(name)
+}
+
+func DBMaster(name string) (*sqlx.DB, error) {
+	return db.Master(name)
+}
+
+func DBSlave(name string) (*sqlx.DB, error) {
+	return db.Slave(name)
+}
+
+func Redis(name string) (RedisCmdable, error) {
+	return redisx.Get(name)
+}
+
+func Router() *mux.Router {
+	return defaultServer.router
+}
+
+func FlagSet() *flag.FlagSet {
+	return defaultServer.flags
+}
+
+func Cron() *cron.Cron {
+	if defaultServer.cron == nil {
+		panic("cron not start")
+	}
+
+	return defaultServer.cron
+}
+
+func Config() ServerConfig {
+	return defaultServer.Config
+}

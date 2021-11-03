@@ -36,7 +36,7 @@ const (
 type Config struct {
 	EncoderMode   string `json:"encoderMode" yaml:"encoderMode"`
 	RotatorMode   string `json:"rotatorMode" yaml:"rotatorMode"`
-	Level         int    `json:"level" yaml:"level"`
+	Level         Level  `json:"level" yaml:"level"`
 	WithoutCaller bool   `json:"withoutCaller" yaml:"withoutCaller"`
 	FileName      string `json:"fileName" yaml:"fileName"`
 	MaxSize       int    `json:"maxSize" yaml:"maxSize"`

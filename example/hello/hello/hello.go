@@ -20,13 +20,13 @@ func (h *Hello) Name() string {
 	return "hello"
 }
 
-func (h *Hello) Init(ctx *shiba.Context) error {
-	ctx.Router().Handle("/hello", wrapHandle(ctx, h.helloHandler))
-	ctx.FlagSet().StringVar(&h.FlagName, "name", "", "hello to who")
+func (h *Hello) Init() error {
+	shiba.Router().Handle("/hello", wrapHandle(h.helloHandler))
+	shiba.FlagSet().StringVar(&h.FlagName, "name", "", "hello to who")
 	return nil
 }
 
-func (h *Hello) Start(ctx *shiba.Context) error {
+func (h *Hello) Start() error {
 	fmt.Printf("hello %s service is start:%s\n", h.FlagName, h.Config.Str)
 	//db, err := server.DBSlave("localhost")
 	//if err != nil {
@@ -43,9 +43,9 @@ func (h *Hello) Start(ctx *shiba.Context) error {
 	return nil
 }
 
-func (h *Hello) Stop(ctx *shiba.Context) error {
+func (h *Hello) Stop() error {
 	fmt.Println("hello service is stop:" + h.Config.Str)
-	ctx.Logger("hello").Error("hahhahah hello")
+	shiba.Logger("hello").Error("hahhahah hello")
 	return nil
 }
 
