@@ -1,5 +1,10 @@
-production: false
-port: 9999
+shiba:
+  serviceName: shiba # 服务名称
+  port: 9999 # 端口
+  certFile: "" # 证书文件
+  keyFile: "" # 私钥文件
+  disableSignatureCheck: true # 是否禁用签名校验
+  tracingAgentHostPort: "" # 跟踪代理地址
 log:
   fileName: "./logs/log.log"
   maxSize: 50 # 日志文件转储的最大大小，单位MiB

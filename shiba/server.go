@@ -34,7 +34,6 @@ func NewServer(opts ...Option) *Server {
 
 type ServerConfig struct {
 	ServiceName           string `yaml:"serviceName"`
-	Production            bool   `yaml:"production"`
 	Port                  string `yaml:"port"`
 	CertFile              string `yaml:"certFile"`
 	KeyFile               string `yaml:"keyFile"`
@@ -113,7 +112,7 @@ func (s *Server) Start() error {
 	}
 
 	if s.Config.openCron {
-		cronLogger := cronLogger{logger: defaultLogger}
+		cronLogger := cronLogger{logger: defaultLogger.AddCallerSkip(1)}
 		s.cron = cron.New(
 			cron.WithLogger(cronLogger),
 			cron.WithChain(cron.SkipIfStillRunning(cronLogger)),

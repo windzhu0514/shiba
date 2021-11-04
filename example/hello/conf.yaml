@@ -1,5 +1,4 @@
 shiba:
-  production: true
   port: 9999
   certFile: "certFile"
   keyFile: "keyFile"
@@ -10,5 +9,3 @@ log:
   maxAge: 3
 hello:
   str: "hahahaha"
-
-

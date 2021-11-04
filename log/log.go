@@ -61,6 +61,7 @@ type Logger interface {
 	Fatalf(format string, args ...interface{})
 	With(args ...interface{}) Logger
 	SetLevel(l Level)
+	AddCallerSkip(skip int) Logger
 	Clone(name string) Logger
 	Close() error
 	ServeHTTP(w http.ResponseWriter, r *http.Request)
@@ -194,6 +195,10 @@ func SetLevel(lvl Level) {
 	defaultLogger.SetLevel(lvl)
 }
 
+func AddCallerSkip(skip int) Logger {
+	return defaultLogger.AddCallerSkip(skip)
+}
+
 func Clone(name string) Logger {
 	return defaultLogger.Clone(name)
 }
@@ -257,6 +262,7 @@ func (l *logger) Fatal(args ...interface{}) {
 
 func (l *logger) Fatalf(format string, args ...interface{}) {
 	l.logger.Fatalf(format, args...)
+	l.logger.Desugar()
 }
 
 func (l *logger) With(args ...interface{}) Logger {
@@ -268,6 +274,13 @@ func (l *logger) With(args ...interface{}) Logger {
 
 func (l *logger) SetLevel(lvl Level) {
 	l.level.SetLevel(zapcore.Level(lvl - 1))
+}
+
+func (l *logger) AddCallerSkip(skip int) Logger {
+	return &logger{
+		logger: l.logger.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar(),
+		level:  l.level,
+	}
 }
 
 func (l *logger) Clone(name string) Logger {
