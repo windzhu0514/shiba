@@ -91,14 +91,12 @@ func (s *Server) Start() error {
 
 	for _, mod := range modules {
 		_, exist := fileCfg[mod.Name]
-		if !exist {
-			continue
-		}
-
-		if err := rawFileCfg.Decode(mod.Module); err != nil {
-			errMsg := fmt.Sprintf("module [%s] decode redisConfig:%s", mod.Name, err.Error())
-			defaultLogger.Errorf(errMsg)
-			return errors.New(errMsg)
+		if exist {
+			if err := rawFileCfg.Decode(mod.Module); err != nil {
+				errMsg := fmt.Sprintf("module [%s] decode redisConfig:%s", mod.Name, err.Error())
+				defaultLogger.Errorf(errMsg)
+				return errors.New(errMsg)
+			}
 		}
 
 		if err := mod.Module.Start(); err != nil {
