@@ -62,7 +62,6 @@ func (s *Server) Start() error {
 		}
 	}
 
-	flagPort := s.flags.String("p", "9999", "listen port")
 	flagConfigFile := s.flags.String("f", "conf.yaml", "redisConfig file path")
 	if err := s.flags.Parse(os.Args[1:]); err != nil {
 		return fmt.Errorf("flag parse:" + err.Error())
@@ -138,12 +137,11 @@ func (s *Server) Start() error {
 	//  curl -X PUT localhost:8080/log_level -H "Content-Type: application/json" -d '{"level":"debug"}'
 	s.router.HandleFunc("/log_level", defaultLogger.ServeHTTP)
 
-	port := s.Config.Port
-	if *flagPort != "" {
-		port = *flagPort
+	if s.Config.Port == "" {
+		s.Config.Port = "9999"
 	}
 
-	svr := hihttp.NewServer(":"+port, s.router)
+	svr := hihttp.NewServer(":"+s.Config.Port, s.router)
 	svr.RegisterOnShutdown(func() {
 		s.stop()
 	})
