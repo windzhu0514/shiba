@@ -1,7 +1,7 @@
 shiba:
   port: 9999
-  certFile: "certFile"
-  keyFile: "keyFile"
+  certFile: ""
+  keyFile: ""
   disableSignatureCheck: true
 log:
   fileName: "./logs/log.log"
