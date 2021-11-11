@@ -11,12 +11,27 @@ import (
 )
 
 func newServer(addr string, handler http.Handler) HttpServer {
-	return endless.NewServer(addr, handler)
+	return &server{
+		srv: endless.NewServer(addr, handler),
+	}
 }
 
 func listenAndServe(addr string, handler http.Handler) error {
-	server := endless.NewServer(addr, handler)
-	err := server.ListenAndServe()
+	srv := &server{srv: endless.NewServer(addr, handler)}
+	return svr.ListenAndServe()
+}
+
+func listenAndServeTLS(addr, certFile, keyFile string, handler http.Handler) error {
+	srv := &server{srv: endless.NewServer(addr, handler)}
+	return srv.ListenAndServeTLS(certFile, keyFile)
+}
+
+type server struct {
+	srv HttpServer
+}
+
+func (s *server) ListenAndServe() error {
+	err := s.svr.ListenAndServe()
 	if err != nil && strings.Contains(err.Error(), "use of closed network connection") {
 		return nil
 	}
@@ -24,11 +39,15 @@ func listenAndServe(addr string, handler http.Handler) error {
 	return err
 }
 
-func listenAndServeTLS(addr string, certFile string, keyFile string, handler http.Handler) error {
-	server := endless.NewServer(addr, handler)
-	err := server.ListenAndServeTLS(certFile, keyFile)
+func (s *server) ListenAndServeTLS(certFile, keyFile string) error {
+	err := s.svr.ListenAndServeTLS(certFile, keyFile)
 	if err != nil && strings.Contains(err.Error(), "use of closed network connection") {
 		return nil
 	}
+
 	return err
+}
+
+func (s *server) RegisterOnShutdown(f func()) {
+	s.srv.RegisterOnShutdown(f)
 }
