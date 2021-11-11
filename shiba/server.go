@@ -53,6 +53,7 @@ type Server struct {
 	flags  *flag.FlagSet
 	router *mux.Router
 	cron   *cron.Cron
+	onStop []func()
 }
 
 func (s *Server) Start() error {
@@ -140,10 +141,6 @@ func (s *Server) Start() error {
 	}
 
 	svr := hihttp.NewServer(":"+s.Config.Port, s.router)
-	svr.RegisterOnShutdown(func() {
-		s.stop()
-	})
-
 	s.router.Use(s.Config.middlewares...)
 
 	if len(s.Config.TracingAgentHostPort) > 0 {
@@ -154,7 +151,7 @@ func (s *Server) Start() error {
 			return errors.New(errMsg)
 		}
 
-		svr.RegisterOnShutdown(func() {
+		s.registerOnStop(func() {
 			if err := closer.Close(); err != nil {
 				defaultLogger.Errorf("module [shiba] Tracer Close:%s\n", err.Error())
 			}
@@ -175,6 +172,8 @@ func (s *Server) Start() error {
 		}
 	}
 
+	s.stop()
+
 	err := defaultLogger.Close()
 	if err != nil {
 		errMsg := fmt.Sprintf("module log stop failed:" + err.Error())
@@ -188,12 +187,6 @@ func (s *Server) Start() error {
 func (s *Server) stop() {
 	for i := len(modules) - 1; i >= 0; i-- {
 		mod := modules[i]
-
-		_, exist := fileCfg[mod.Name]
-		if !exist {
-			continue
-		}
-
 		if err := mod.Module.Stop(); err != nil {
 			defaultLogger.Infof("module [%s] stop:%s", mod.Name, err.Error())
 			// not return
@@ -201,10 +194,18 @@ func (s *Server) stop() {
 			defaultLogger.Infof("module [%s] priority:%d stop success", mod.Name, mod.Priority)
 		}
 	}
+
+	for _, f := range s.onStop {
+		f()
+	}
 }
 
 func (s *Server) RegisterModule(priority int, mod Module) {
 	registerModule(priority, mod)
+}
+
+func (s *Server) registerOnStop(f func()) {
+	s.onStop = append(s.onStop, f)
 }
 
 // func GetModule(name string) Module {
