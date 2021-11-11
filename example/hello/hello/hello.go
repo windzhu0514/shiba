@@ -39,6 +39,10 @@ func (h *Hello) Start() error {
 	//}
 	//
 	//fmt.Println(count)
+	//time.AfterFunc(time.Second*15, func() {
+	//	shiba.Logger("hello").Info("time now")
+	//	syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+	//})
 
 	return nil
 }

@@ -10,7 +10,6 @@ import (
 type HttpServer interface {
 	ListenAndServe() error
 	ListenAndServeTLS(certFile, keyFile string) error
-	RegisterOnShutdown(f func())
 }
 
 func NewServer(addr string, handler http.Handler) HttpServer {

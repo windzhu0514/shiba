@@ -51,6 +51,7 @@ func (s *server) ListenAndServe() error {
 	<-idleConnsClosed
 	return err
 }
+
 func (s *server) ListenAndServeTLS(certFile, keyFile string) error {
 	idleConnsClosed := make(chan struct{})
 	go func() {
@@ -70,8 +71,4 @@ func (s *server) ListenAndServeTLS(certFile, keyFile string) error {
 	err := s.svr.ListenAndServeTLS(certFile, keyFile)
 	<-idleConnsClosed
 	return err
-}
-
-func (s *server) RegisterOnShutdown(f func()) {
-	s.svr.RegisterOnShutdown(f)
 }

@@ -12,22 +12,28 @@ import (
 
 func newServer(addr string, handler http.Handler) HttpServer {
 	return &server{
-		srv: endless.NewServer(addr, handler),
+		svr: endless.NewServer(addr, handler),
 	}
 }
 
 func listenAndServe(addr string, handler http.Handler) error {
-	srv := &server{srv: endless.NewServer(addr, handler)}
+	svr := &server{
+		svr: endless.NewServer(addr, handler),
+	}
+
 	return svr.ListenAndServe()
 }
 
 func listenAndServeTLS(addr, certFile, keyFile string, handler http.Handler) error {
-	srv := &server{srv: endless.NewServer(addr, handler)}
-	return srv.ListenAndServeTLS(certFile, keyFile)
+	svr := &server{
+		svr: endless.NewServer(addr, handler),
+	}
+
+	return svr.ListenAndServeTLS(certFile, keyFile)
 }
 
 type server struct {
-	srv HttpServer
+	svr HttpServer
 }
 
 func (s *server) ListenAndServe() error {
@@ -46,8 +52,4 @@ func (s *server) ListenAndServeTLS(certFile, keyFile string) error {
 	}
 
 	return err
-}
-
-func (s *server) RegisterOnShutdown(f func()) {
-	s.srv.RegisterOnShutdown(f)
 }
