@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	var middlewares []shiba.MiddlewareFunc
+	var middlewares []shiba.Middleware
 	middlewares = append(middlewares, shiba.MiddlewareRecover(func(
 		w http.ResponseWriter, r *http.Request, err interface{},
 	) {
